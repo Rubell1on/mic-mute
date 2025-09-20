@@ -1,6 +1,6 @@
 {
   "name": "mute-mic",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,6 +11,7 @@
   "description": "",
   "dependencies": {
     "node-global-key-listener": "^0.3.0",
+    "node-notifier": "^10.0.1",
     "node-systray-v2": "github:Edgar-P-yan/node-systray-v2",
     "win-audio": "^3.0.5"
   }
