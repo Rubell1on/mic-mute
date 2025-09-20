@@ -14,9 +14,9 @@ const notifier = require('node-notifier');
   const mutedIcon = await fs.readFile(path.resolve(iconsDir, 'muted.ico'), { encoding: 'base64' });
 
   const shortcutController = new ShortcutController();
-  shortcutController.load();
+  await shortcutController.load();
   const mic = audio.mic;
-  let hotkeyListener = new GlobalKeyboardListener();
+  let shortcutListener = new GlobalKeyboardListener();
 
   const appNameItem = {
     title: 'MuteMic',
@@ -26,19 +26,19 @@ const notifier = require('node-notifier');
 
   let currentShortcutItem = {
     title: shortcutController.shortcut.toString(),
-    tooltip: 'Сочетание горячих клавиш',
+    tooltip: 'Shortcut',
     enabled: false,
   };
 
   const changeShortcutItem = {
-    title: 'Изменить сочетание клавиш',
-    tooltip: 'Изменить сочетание клавиш',
+    title: 'Set shortcut',
+    tooltip: 'Set shortcut',
     enabled: true,
   };
 
   const exitItem = {
-    title: 'Закрыть',
-    tooltip: 'Закрыть',
+    title: 'Close',
+    tooltip: 'Close',
     enabled: true,
   };
 
@@ -76,12 +76,12 @@ const notifier = require('node-notifier');
   sysTray.onClick(async action => {
     switch (action.seq_id) {
       case 2: {
-        const wannaChangeShortcut = await new Promise((resolve, reject) => {
+        const wannaChangeShortcutResult = await new Promise((resolve, reject) => {
           notifier.notify({
-            title: 'Хотите изменить сочетание клавиш?',
-            message: 'После нажатия на "Да" удерживайте новое сочетание клавиш пока не появится следующее уведомление',
+            title: 'Do you want to change shortcut?',
+            message: 'After press "Yes" hold new shortcut until next notification',
             icon: appIconPath,
-            actions: ['Да', 'Нет'],
+            actions: ['Yes', 'No'],
             wait: true
           }, (err, data) => {
             if (err) reject(err);
@@ -90,11 +90,11 @@ const notifier = require('node-notifier');
           })
         });
 
-        if (['dismissed', 'timeout', 'нет'].includes(wannaChangeShortcut)) return;
+        if (['dismissed', 'timeout', 'no'].includes(wannaChangeShortcutResult)) return;
 
-        hotkeyListener.removeListener(onShortcut);
+        shortcutListener.removeListener(onShortcut);
 
-        function getShortcut(hotkeyListener, finishAfterKeyDown = 1000, failDelay = 5000) {
+        function getShortcut(shortcutListener, finishAfterKeyDown = 1000, failDelay = 5000) {
           return new Promise((resolve, reject) => {
             const keys = new Set();
             let changeTimeout = null;
@@ -105,66 +105,58 @@ const notifier = require('node-notifier');
                 if (keys.has(e.name)) return false;
                 keys.add(e.name);
 
-                if (failTimeout) {
-                  clearTimeout(failTimeout);
-                  console.log(`${new Date()} Удален failTimeout`)
-                }
+                if (failTimeout) clearTimeout(failTimeout);
               } else {
                 keys.delete(e.name);
               }
 
-              if (changeTimeout) {
-                clearTimeout(changeTimeout);
-                console.log(`${new Date()} Удален changeTimeout`)
-              }
+              if (changeTimeout) clearTimeout(changeTimeout);
               if (keys.size) {
                 changeTimeout = setTimeout(() => {
-                  hotkeyListener.removeListener(onShortcutChange);
+                  shortcutListener.removeListener(onShortcutChange);
                   resolve(new Shortcut(Array.from(keys)));
                 }, finishAfterKeyDown);
-                console.log(`${new Date()} Создан changeTimeout`)
               } else {
                 failTimeout = setTimeout(() => {
-                  hotkeyListener.removeListener(onShortcutChange);
-                  reject(new Error(`Завершено по таймауту в ${failDelay} мс.`));
+                  shortcutListener.removeListener(onShortcutChange);
+                  reject(new Error(`Timed out ${failDelay} ms.`));
                 }, failDelay);
-                console.log(`${new Date()} Создан failTimeout`)
               }
 
               return false;
             }
-            hotkeyListener.addListener(onShortcutChange);
+            shortcutListener.addListener(onShortcutChange);
           });
         }
 
         let _shortcut = null;
 
         try {
-          _shortcut = await getShortcut(hotkeyListener);
+          _shortcut = await getShortcut(shortcutListener);
         } catch (e) {
-          console.error(`Не удалось получить новое сочетание клавиш: ${e.message}`);
+          console.error(`Cannot get new shortcut: ${e.message}`);
         }
 
-        hotkeyListener.kill();
-        hotkeyListener = new GlobalKeyboardListener();
-        hotkeyListener.addListener(onShortcut);
+        shortcutListener.kill();
+        shortcutListener = new GlobalKeyboardListener();
+        shortcutListener.addListener(onShortcut);
 
         if (!_shortcut) {
           notifier.notify({
-            title: 'Изменение горячих клавиш',
-            message: `Сочетание клавиш не было записано`,
+            title: 'Changing shortcut',
+            message: `The shortcut haven't saved`,
             icon: appIconPath,
           });
 
           return false;
         }
 
-        const saveShortcut = await new Promise((resolve, reject) => {
+        const saveShortcutResult = await new Promise((resolve, reject) => {
           notifier.notify({
-            title: 'Изменение горячих клавиш',
-            message: `Сохранить сочетание клавиш ${_shortcut.toString()}?`,
+            title: 'Changing shortcut',
+            message: `Do you want to save shortcut: ${_shortcut.toString()}?`,
             icon: appIconPath,
-            actions: ['Да', 'Нет'],
+            actions: ['Yes', 'No'],
             wait: true
           }, (err, data) => {
             if (err) reject(err);
@@ -173,17 +165,17 @@ const notifier = require('node-notifier');
           })
         });
 
-        if (['dismissed', 'timeout', 'нет'].includes(saveShortcut)) {
+        if (['dismissed', 'timeout', 'no'].includes(saveShortcutResult)) {
           notifier.notify({
-            title: 'Изменение горячих клавиш',
-            message: `Сочетание клавиш не было записано`,
+            title: 'Changing shortcut',
+            message: `The shortcut haven't saved`,
             icon: appIconPath,
           });
 
           return;
         }
 
-        shortcutController.save(_shortcut);
+        await shortcutController.save(_shortcut);
         sysTray.sendAction({
           type: 'update-item',
           seq_id: 1,
@@ -194,8 +186,8 @@ const notifier = require('node-notifier');
         });
 
         notifier.notify({
-          title: 'Изменение горячих клавиш',
-          message: `Сочетание клавиш ${_shortcut.toString()} успешно сохранено`,
+          title: 'Success!',
+          message: `Shortcut ${_shortcut.toString()} saved successfully`,
           icon: appIconPath,
         })
 
@@ -208,5 +200,5 @@ const notifier = require('node-notifier');
     }
   });
 
-  hotkeyListener.addListener(onShortcut);
+  shortcutListener.addListener(onShortcut);
 })();

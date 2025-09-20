@@ -18,8 +18,16 @@ class ShortcutController {
   shortcut;
 
   async load() {
-    if (await fs.access(SHORTCUT_FILE_PATH, fs.constants.F_OK)) {
-      const _shortcut = JSON.parse(await fs.readFile(SHORTCUT_FILE_PATH));
+    let shortcutFile = null;
+
+    try {
+      shortcutFile = await fs.readFile(SHORTCUT_FILE_PATH)
+    } catch (e) {
+      console.info('Shortcut file not found');
+    }
+
+    if (shortcutFile) {
+      const _shortcut = JSON.parse(shortcutFile);
 
       if (
         typeof _shortcut === 'object'
